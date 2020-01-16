@@ -1,0 +1,308 @@
+---
+title: "Curly Curly Guide"
+author: "Stephanie"
+date: "16/01/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = FALSE)
+```
+
+Replacing quo, enquo and !! with {{. From the website https://edwinth.github.io/blog/dplyr-recipes/, I have tried to rewrite all of the examples using {{ instead, referencing https://www.tidyverse.org/blog/2019/06/rlang-0-4-0/.
+
+```{r}
+library(tidyverse)
+```
+
+## Bare to Quosure: quo
+
+### Old:
+
+```{r}
+bare_to_quo <- function(x, var){
+  x %>% select(!!var) %>% head(1)
+}
+bare_to_quo(mtcars, quo(cyl))
+
+##           cyl
+## Mazda RX4   6
+
+```
+
+### New:
+
+{{ replaces both quo in the function call and !! in the function. Making this example the same as the following one.
+
+```{r}
+bare_to_quo <- function(x, var){
+  x %>% select({{var}}) %>% head(1)
+}
+bare_to_quo(mtcars, cyl)
+
+##           cyl
+## Mazda RX4   6
+
+```
+
+## Bare to Quosure in Function: enquo
+
+### Old:
+
+```{r}
+bare_to_quo_in_func <- function(x, var) {
+  var_enq <- enquo(var)
+  x %>% select(!!var_enq) %>% head(1)
+}
+bare_to_quo_in_func(mtcars, mpg)
+##           mpg
+## Mazda RX4  21
+
+```
+
+### New:
+
+```{r}
+bare_to_quo_in_func <- function(x, var) {
+  x %>% select({{var}}) %>% head(1)
+}
+bare_to_quo_in_func(mtcars, mpg)
+##           mpg
+## Mazda RX4  21
+
+```
+
+## Quosure to a Name: quo_name
+
+### Old:
+
+```{r}
+bare_to_name <- function(x, nm) {
+  nm_name <- quo_name(nm)
+  x %>% mutate(!!nm_name := 42) %>% head(1) %>% 
+    select(!!nm)
+}
+bare_to_name(mtcars, quo(this_is_42))
+##   this_is_42
+## 1         42
+
+```
+
+### New:
+
+```{r}
+bare_to_name <- function(x, nm) {
+  x %>% mutate({{nm}} := 42) %>% head(1) %>% 
+    select({{nm}})
+}
+bare_to_name(mtcars, this_is_42)
+##   this_is_42
+## 1         42
+
+```
+
+## Quosure to Text: quo_text
+
+### Old:
+
+```{r}
+quo_to_text <- function(x, var) {
+  var_enq <- enquo(var)
+  glue::glue("The following column was selected: {rlang::quo_text(var_enq)}")
+}
+quo_to_text(mtcars, cyl)
+
+## The following column was selected: cyl
+
+```
+
+### New:
+
+There is no replacement for this, as {{ does both enquo and !!, but only enquo is needed here. Another example is passing quo_to_text for the by argument of a join
+
+## Quosure to Text: joins
+
+### Old:
+
+```{r}
+
+tab1 <- tibble::tribble(
+  ~A,  ~B,
+   1, 500,
+   2, 600,
+   3, 700,
+   4, 800
+  )
+
+tab2 <- tibble::tribble(
+          ~A,       ~C,
+           2, "Orange",
+           1,   "Pink",
+           4,  "Green",
+           3,   "Blue"
+          )
+
+quo_to_text_joins <- function(x, y, var) {  
+  var_enq <- enquo(var)
+  temp <- left_join(x, y, by = rlang::quo_text(var_enq))
+   }
+
+quo_to_text_joins(tab1, tab2, A) %>% print()
+
+##  A   B     C
+##  1   500   Pink
+##  2   600   Orange
+##  3   700   Blue
+##  4   800   Green
+
+```
+
+### New:
+
+Again there is no replacement for this code using {{
+
+## Character to Name: sym (edited)
+
+### Old:
+
+```{r}
+char_to_quo <- function(x, var) {
+  var_enq <- rlang::sym(var)
+  x %>% select(!!var_enq) %>% head(1)
+}
+char_to_quo(mtcars, "vs")
+##           vs
+## Mazda RX4  0
+
+```
+
+### New:
+
+This scenario uses the other half of enquo/!! duo. Only uses !! and hence no replacement for this code using {{. However, you can use the .data pronoun to simplify the code.
+
+```{r}
+char_to_quo <- function(x, var) {
+  x %>% select(.data[[var]]) %>% head(1)
+}
+char_to_quo(mtcars, "vs")
+##           vs
+## Mazda RX4  0
+
+```
+
+## Multiple Bares to Quosure: quos
+
+### Old:
+
+```{r}
+bare_to_quo_mult <- function(x, ...) {
+  grouping <- quos(...)
+  x %>% group_by(!!!grouping) %>% summarise(nr = n())
+}
+bare_to_quo_mult(mtcars, vs, cyl)
+## # A tibble: 5 x 3
+## # Groups:   vs [?]
+##      vs   cyl    nr
+##   <dbl> <dbl> <int>
+## 1     0     4     1
+## 2     0     6     3
+## 3     0     8    14
+## 4     1     4    10
+## 5     1     6     4
+
+```
+
+### New:
+
+Simply reference ..., no need for quos/!!! or {{. You only need quote-and-unquote (with the plural variants enquos() and !!!) when you need to modify the inputs or their names in some way.
+
+```{r}
+bare_to_quo_mult <- function(x, ...) {
+  x %>% group_by(...) %>% summarise(nr = n())
+}
+bare_to_quo_mult(mtcars, vs, cyl)
+## # A tibble: 5 x 3
+## # Groups:   vs [?]
+##      vs   cyl    nr
+##   <dbl> <dbl> <int>
+## 1     0     4     1
+## 2     0     6     3
+## 3     0     8    14
+## 4     1     4    10
+## 5     1     6     4
+
+```
+
+## Multiple Characters to Names: syms (edited)
+
+### Old:
+
+```{r}
+bare_to_quo_mult_chars <- function(x, ...) {
+  grouping <- rlang::syms(...)
+  x %>% group_by(!!!grouping) %>% summarise(nr = n())
+}
+bare_to_quo_mult_chars(mtcars, list("vs", "cyl"))
+## # A tibble: 5 x 3
+## # Groups:   vs [?]
+##      vs   cyl    nr
+##   <dbl> <dbl> <int>
+## 1     0     4     1
+## 2     0     6     3
+## 3     0     8    14
+## 4     1     4    10
+## 5     1     6     4
+
+```
+
+### New:
+
+No replacement for this code, as it uses only half of enquo/!! syntax.
+
+## Quoting Full Expression
+
+Although quoting column names is most often used, it is by no means the only option. We can use the above to quote full expressions.
+
+### Old:
+
+```{r}
+filter_func <- function(x, filter_exp) {
+  filter_exp_enq <- enquo(filter_exp)
+  x %>% filter(!!filter_exp_enq)
+}
+filter_func(mtcars, hp == 93)
+##    mpg cyl disp hp drat   wt  qsec vs am gear carb
+## 1 22.8   4  108 93 3.85 2.32 18.61  1  1    4    1
+
+```
+
+### New:
+
+```{r}
+filter_func <- function(x, filter_exp) {
+  x %>% filter({{filter_exp}})
+}
+filter_func(mtcars, hp == 93)
+##    mpg cyl disp hp drat   wt  qsec vs am gear carb
+## 1 22.8   4  108 93 3.85 2.32 18.61  1  1    4    1
+
+```
+
+## Quoting Full Expression in a Character: parse_expr
+
+### Old:
+
+```{r}
+filter_by_char <- function(x, char) {
+  func_call <- rlang::parse_expr(char)
+  x %>% filter(!!func_call)
+}
+filter_by_char(mtcars, "cyl == 6") %>% head(1)
+##   mpg cyl disp  hp drat   wt  qsec vs am gear carb
+## 1  21   6  160 110  3.9 2.62 16.46  0  1    4    4
+
+```
+
+### New:
+
+No replacement for this code.
