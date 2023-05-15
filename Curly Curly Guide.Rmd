@@ -305,4 +305,4 @@ filter_by_char(mtcars, "cyl == 6") %>% head(1)
 
 ### New:
 
-No replacement for this code.
+No replacement for this code
